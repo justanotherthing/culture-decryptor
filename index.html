@@ -3,157 +3,278 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>RED ROCK | Culture Decryptor</title>
+    <title>RED ROCK | SILO BREAKER</title>
     <style>
-        :root { --red: #ff4d4d; --dark-red: #8b0000; --bg: #0a0a0a; }
-        body {
-            background-color: var(--bg);
-            background-image: radial-gradient(circle, #1a1a1a 1px, transparent 1px);
-            background-size: 30px 30px;
-            color: white;
-            font-family: 'Courier New', Courier, monospace;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            overflow: hidden;
-            text-transform: uppercase;
-        }
-
-        #terminal {
-            width: 90%;
-            max-width: 450px;
-            border: 2px solid #333;
-            background: rgba(0, 0, 0, 0.9);
-            padding: 20px;
-            box-shadow: 0 0 30px rgba(255, 77, 77, 0.1);
-            position: relative;
-        }
-
-        .header { color: var(--red); letter-spacing: 4px; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px; font-weight: bold; }
+        body { margin: 0; overflow: hidden; background: #050505; font-family: 'Segoe UI', sans-serif; touch-action: none; }
+        canvas { display: block; }
         
-        .timer-box { font-size: 2.5rem; color: var(--red); margin: 15px 0; text-shadow: 0 0 10px var(--red); }
-
-        /* The Game Grid */
-        .grid { display: grid; gap: 10px; margin-bottom: 20px; }
-        .row { display: flex; justify-content: center; gap: 8px; }
-
-        .cell {
-            width: 50px;
-            height: 60px;
-            background: #1a1a1a;
-            border: 1px solid #444;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.8rem;
-            font-weight: 900;
-            cursor: pointer;
-            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            user-select: none;
+        #ui-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; display: flex; flex-direction: column; justify-content: center; align-items: center;
         }
-
-        .cell:active { transform: scale(0.9); background: #333; }
-        .cell.solved { 
-            background: var(--dark-red); 
-            border-color: var(--red); 
-            color: white; 
-            box-shadow: inset 0 0 15px rgba(255, 77, 77, 0.5); 
-        }
-
-        #unlock-zone { height: 60px; display: flex; align-items: center; justify-content: center; }
         
-        .btn-booking {
-            display: none;
-            background: var(--red);
-            color: white;
-            border: none;
-            padding: 15px 25px;
+        h1 { color: white; font-size: 4rem; margin: 0; text-shadow: 0 0 20px #ff0000; letter-spacing: 5px; opacity: 0; animation: fadein 2s forwards; }
+        p { color: #aaa; font-size: 1.2rem; margin-top: 10px; opacity: 0; animation: fadein 2s 1s forwards; }
+
+        #start-btn, #book-btn {
+            pointer-events: auto;
+            background: rgba(255, 0, 0, 0.2);
+            border: 2px solid #ff0000;
+            color: #ff0000;
+            padding: 15px 40px;
+            font-size: 1.5rem;
             font-weight: bold;
-            font-family: inherit;
             cursor: pointer;
-            width: 100%;
-            animation: flicker 2s infinite;
+            margin-top: 20px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            transition: all 0.2s;
+            box-shadow: 0 0 15px rgba(255, 0, 0, 0.3);
+            display: none;
         }
 
-        @keyframes flicker {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.8; }
+        #start-btn:hover, #book-btn:hover { background: #ff0000; color: black; box-shadow: 0 0 30px #ff0000; }
+
+        #score-board {
+            position: absolute; top: 20px; left: 20px; color: white; font-size: 1.5rem; font-weight: bold;
+            text-shadow: 0 0 10px white; pointer-events: none;
         }
+
+        @keyframes fadein { to { opacity: 1; } }
     </style>
 </head>
 <body>
 
-<div id="terminal">
-    <div class="header">RED ROCK // DECIPHER</div>
-    <div style="font-size: 0.7rem; opacity: 0.6;">Align core pillars to authorize calendar access.</div>
-    
-    <div class="timer-box" id="timer">30.00</div>
+    <div id="score-board">POTENTIAL: 0%</div>
+    <canvas id="gameCanvas"></canvas>
 
-    <div class="grid">
-        <div class="row" id="row1"></div>
-        <div class="row" id="row2"></div>
+    <div id="ui-layer">
+        <h1 id="title-text">RED ROCK</h1>
+        <p id="sub-text">BREAK THE SILOS. BUILD THE TEAM.</p>
+        <button id="start-btn">INITIALIZE MISSION</button>
+        <button id="book-btn">MISSION COMPLETE - BOOK STRATEGY</button>
     </div>
-
-    <div id="unlock-zone">
-        <button class="btn-booking" id="bookBtn" onclick="window.location.href='https://calendly.com'">ACCESS GRANTED - BOOK NOW</button>
-    </div>
-</div>
 
 <script>
-    const words = ["TRUST", "ALIGN"];
-    const rows = [document.getElementById('row1'), document.getElementById('row2')];
-    let time = 3000;
-    let active = true;
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    let width, height;
 
-    // Build the interactive rows
-    words.forEach((word, rowIndex) => {
-        word.split('').forEach((char, charIndex) => {
-            const cell = document.createElement('div');
-            cell.className = 'cell';
-            // Start with a random letter that isn't the correct one
-            let randomChar;
-            do { randomChar = String.fromCharCode(65 + Math.floor(Math.random() * 26)); }
-            while (randomChar === char);
-            
-            cell.innerText = randomChar;
-            cell.dataset.target = char;
-            cell.onclick = () => rotate(cell);
-            rows[rowIndex].appendChild(cell);
+    // Game State
+    let gameRunning = false;
+    let score = 0;
+    const maxScore = 10; // Collect 10 dots to win
+    let particles = [];
+    
+    // Player
+    const player = { x: 0, y: 0, size: 15, speed: 5, angle: 0, trail: [] };
+    const mouse = { x: 0, y: 0 };
+    
+    // Entities
+    let enemies = [];
+    let targets = [];
+
+    function resize() {
+        width = canvas.width = window.innerWidth;
+        height = canvas.height = window.innerHeight;
+        if(!gameRunning) {
+            player.x = width / 2;
+            player.y = height / 2;
+            mouse.x = width / 2;
+            mouse.y = height / 2;
+        }
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // Controls (Mouse & Touch)
+    window.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+    window.addEventListener('touchmove', e => { 
+        e.preventDefault();
+        mouse.x = e.touches[0].clientX; 
+        mouse.y = e.touches[0].clientY; 
+    }, {passive: false});
+
+    // UI Logic
+    const startBtn = document.getElementById('start-btn');
+    const bookBtn = document.getElementById('book-btn');
+    const titleText = document.getElementById('title-text');
+    const subText = document.getElementById('sub-text');
+    const scoreBoard = document.getElementById('score-board');
+
+    // Initial State
+    startBtn.style.display = 'block';
+
+    startBtn.onclick = () => {
+        gameRunning = true;
+        score = 0;
+        enemies = [];
+        targets = [];
+        particles = [];
+        spawnTarget();
+        startBtn.style.display = 'none';
+        titleText.style.display = 'none';
+        subText.style.display = 'none';
+        bookBtn.style.display = 'none';
+        loop();
+    };
+
+    bookBtn.onclick = () => {
+        window.location.href = "https://calendly.com"; // PUT YOUR LINK HERE
+    };
+
+    class Particle {
+        constructor(x, y, color) {
+            this.x = x; this.y = y;
+            this.vx = (Math.random() - 0.5) * 10;
+            this.vy = (Math.random() - 0.5) * 10;
+            this.life = 1;
+            this.color = color;
+        }
+        update() {
+            this.x += this.vx; this.y += this.vy;
+            this.life -= 0.02;
+        }
+        draw() {
+            ctx.fillStyle = this.color;
+            ctx.globalAlpha = this.life;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, 3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+        }
+    }
+
+    function spawnTarget() {
+        targets.push({
+            x: Math.random() * (width - 40) + 20,
+            y: Math.random() * (height - 40) + 20,
+            size: 8
         });
-    });
+    }
 
-    function rotate(el) {
-        if (el.classList.contains('solved')) return;
+    function spawnEnemy() {
+        // Spawn away from player
+        let ex, ey;
+        do {
+            ex = Math.random() * width;
+            ey = Math.random() * height;
+        } while (Math.hypot(ex - player.x, ey - player.y) < 300);
+
+        enemies.push({ x: ex, y: ey, speed: 2 + (score * 0.3), size: 12 });
+    }
+
+    function loop() {
+        if (!gameRunning) return;
+        requestAnimationFrame(loop);
+
+        // Visuals: Trails
+        ctx.fillStyle = 'rgba(5, 5, 5, 0.2)'; // Creates the trail effect
+        ctx.fillRect(0, 0, width, height);
+
+        // Update Player (Ease towards mouse/finger)
+        const dx = mouse.x - player.x;
+        const dy = mouse.y - player.y;
+        player.x += dx * 0.08;
+        player.y += dy * 0.08;
+
+        // Draw Player
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = '#00ffff';
+        ctx.fillStyle = '#00ffff';
+        ctx.beginPath();
+        ctx.arc(player.x, player.y, player.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // Targets (The "Good Stuff")
+        targets.forEach((t, i) => {
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#00ff00';
+            ctx.fillStyle = '#00ff00';
+            ctx.beginPath();
+            ctx.arc(t.x, t.y, t.size + Math.sin(Date.now()/200)*2, 0, Math.PI*2); // Pulsing
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // Collision with Target
+            if (Math.hypot(player.x - t.x, player.y - t.y) < player.size + t.size) {
+                targets.splice(i, 1);
+                score++;
+                scoreBoard.innerText = "POTENTIAL: " + (score * 10) + "%";
+                
+                // Explosion
+                for(let k=0; k<10; k++) particles.push(new Particle(t.x, t.y, '#00ff00'));
+                
+                if (score >= maxScore) winGame();
+                else {
+                    spawnTarget();
+                    if (score % 2 === 0) spawnEnemy(); // Enemy every 2 points
+                }
+            }
+        });
+
+        // Enemies (The "Bad Stuff")
+        enemies.forEach(e => {
+            // Chase logic
+            const angle = Math.atan2(player.y - e.y, player.x - e.x);
+            e.x += Math.cos(angle) * e.speed;
+            e.y += Math.sin(angle) * e.speed;
+
+            // Draw Enemy
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = '#ff0000';
+            ctx.fillStyle = '#ff0000';
+            ctx.beginPath();
+            ctx.moveTo(e.x, e.y - e.size); // Triangle shape
+            ctx.lineTo(e.x - e.size, e.y + e.size);
+            ctx.lineTo(e.x + e.size, e.y + e.size);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // Collision with Enemy
+            if (Math.hypot(player.x - e.x, player.y - e.y) < player.size + e.size) {
+                gameOver();
+            }
+        });
+
+        // Particles
+        particles.forEach((p, i) => {
+            p.update();
+            p.draw();
+            if (p.life <= 0) particles.splice(i, 1);
+        });
+    }
+
+    function gameOver() {
+        gameRunning = false;
+        // Big explosion
+        for(let k=0; k<30; k++) particles.push(new Particle(player.x, player.y, '#ff0000'));
         
-        let charCode = el.innerText.charCodeAt(0);
-        charCode = charCode === 90 ? 65 : charCode + 1; // Loop A-Z
-        el.innerText = String.fromCharCode(charCode);
-
-        if (el.innerText === el.dataset.target) {
-            el.classList.add('solved');
-            checkWin();
-        }
+        ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
+        ctx.fillRect(0, 0, width, height);
+        
+        titleText.innerText = "SILO DETECTED";
+        titleText.style.color = "red";
+        subText.innerText = "Don't let friction slow you down.";
+        startBtn.innerText = "RETRY MISSION";
+        
+        titleText.style.display = 'block';
+        subText.style.display = 'block';
+        startBtn.style.display = 'block';
     }
 
-    function checkWin() {
-        const solved = document.querySelectorAll('.solved').length;
-        if (solved === 10) {
-            active = false;
-            document.getElementById('timer').innerText = "UNLOCKED";
-            document.getElementById('timer').style.color = "#00ff00";
-            document.getElementById('bookBtn').style.display = "block";
-        }
+    function winGame() {
+        gameRunning = false;
+        titleText.innerText = "POTENTIAL UNLOCKED";
+        titleText.style.color = "#00ff00";
+        subText.innerText = "Your team is ready for the next level.";
+        
+        titleText.style.display = 'block';
+        subText.style.display = 'block';
+        bookBtn.style.display = 'block';
     }
 
-    const clock = setInterval(() => {
-        if (!active) return;
-        time--;
-        document.getElementById('timer').innerText = (time/100).toFixed(2);
-        if (time <= 0) { clearInterval(clock); alert("CRITICAL FAILURE: ACCESS DENIED"); location.reload(); }
-    }, 10);
 </script>
-
 </body>
 </html>
