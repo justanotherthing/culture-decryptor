@@ -3,192 +3,157 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Red Rock | Culture Decryptor</title>
+    <title>RED ROCK | Culture Decryptor</title>
     <style>
-        :root {
-            --rr-red: #cc0000;
-            --rr-dark: #1a1a1a;
-            --rr-gray: #333;
-            --rr-text: #e0e0e0;
-        }
-
+        :root { --red: #ff4d4d; --dark-red: #8b0000; --bg: #0a0a0a; }
         body {
-            margin: 0;
-            padding: 0;
-            background-color: var(--rr-dark);
-            color: var(--rr-text);
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            background-image: radial-gradient(circle, #1a1a1a 1px, transparent 1px);
+            background-size: 30px 30px;
+            color: white;
+            font-family: 'Courier New', Courier, monospace;
             display: flex;
-            flex-direction: column;
-            align-items: center;
             justify-content: center;
+            align-items: center;
             height: 100vh;
+            margin: 0;
             overflow: hidden;
             text-transform: uppercase;
         }
 
-        #game-container {
+        #terminal {
             width: 90%;
-            max-width: 400px;
-            text-align: center;
-            border: 2px solid var(--rr-gray);
+            max-width: 450px;
+            border: 2px solid #333;
+            background: rgba(0, 0, 0, 0.9);
             padding: 20px;
-            background: linear-gradient(145deg, #111, #222);
-            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            box-shadow: 0 0 30px rgba(255, 77, 77, 0.1);
+            position: relative;
         }
 
-        h1 { font-size: 1.2rem; letter-spacing: 3px; margin-bottom: 5px; color: var(--rr-red); }
-        p { font-size: 0.7rem; margin-bottom: 20px; opacity: 0.8; }
+        .header { color: var(--red); letter-spacing: 4px; border-bottom: 1px solid #333; padding-bottom: 10px; margin-bottom: 20px; font-weight: bold; }
+        
+        .timer-box { font-size: 2.5rem; color: var(--red); margin: 15px 0; text-shadow: 0 0 10px var(--red); }
 
-        .timer {
-            font-size: 2rem;
-            font-family: monospace;
-            color: var(--rr-red);
-            margin-bottom: 20px;
-            text-shadow: 0 0 10px rgba(204, 0, 0, 0.5);
-        }
+        /* The Game Grid */
+        .grid { display: grid; gap: 10px; margin-bottom: 20px; }
+        .row { display: flex; justify-content: center; gap: 8px; }
 
-        /* The Decryptor Slots */
-        .slot-container {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-            margin-bottom: 30px;
-        }
-
-        .slot-row {
-            display: flex;
-            justify-content: center;
-            gap: 5px;
-        }
-
-        .letter-box {
-            width: 45px;
-            height: 55px;
-            border: 1px solid var(--rr-gray);
+        .cell {
+            width: 50px;
+            height: 60px;
+            background: #1a1a1a;
+            border: 1px solid #444;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.5rem;
-            font-weight: bold;
-            background: #252525;
+            font-size: 1.8rem;
+            font-weight: 900;
             cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             user-select: none;
-            transition: all 0.2s ease;
         }
 
-        .letter-box.locked {
-            border-color: var(--rr-red);
-            color: white;
-            background: var(--rr-red);
-            box-shadow: 0 0 10px var(--rr-red);
+        .cell:active { transform: scale(0.9); background: #333; }
+        .cell.solved { 
+            background: var(--dark-red); 
+            border-color: var(--red); 
+            color: white; 
+            box-shadow: inset 0 0 15px rgba(255, 77, 77, 0.5); 
         }
 
-        /* Unlock Button (Hidden initially) */
-        #unlock-btn {
+        #unlock-zone { height: 60px; display: flex; align-items: center; justify-content: center; }
+        
+        .btn-booking {
             display: none;
-            background: var(--rr-red);
+            background: var(--red);
             color: white;
             border: none;
-            padding: 15px 30px;
-            font-size: 1rem;
+            padding: 15px 25px;
             font-weight: bold;
+            font-family: inherit;
             cursor: pointer;
             width: 100%;
-            letter-spacing: 2px;
-            animation: pulse 1.5s infinite;
+            animation: flicker 2s infinite;
         }
 
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-            100% { transform: scale(1); }
+        @keyframes flicker {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
         }
     </style>
 </head>
 <body>
 
-    <div id="game-container">
-        <h1>SYSTEM ENCRYPTED</h1>
-        <p>ALIGN THE CORE PILLARS TO UNLOCK ACCESS</p>
-        
-        <div class="timer" id="timer">30:00</div>
+<div id="terminal">
+    <div class="header">RED ROCK // DECIPHER</div>
+    <div style="font-size: 0.7rem; opacity: 0.6;">Align core pillars to authorize calendar access.</div>
+    
+    <div class="timer-box" id="timer">30.00</div>
 
-        <div class="slot-container">
-            <div class="slot-row" id="row-0">
-                <div class="letter-box" onclick="rotate(this, 'T')">X</div>
-                <div class="letter-box" onclick="rotate(this, 'R')">Y</div>
-                <div class="letter-box" onclick="rotate(this, 'U')">Z</div>
-                <div class="letter-box" onclick="rotate(this, 'S')">A</div>
-                <div class="letter-box" onclick="rotate(this, 'T')">B</div>
-            </div>
-            <div class="slot-row" id="row-1">
-                <div class="letter-box" onclick="rotate(this, 'A')">J</div>
-                <div class="letter-box" onclick="rotate(this, 'L')">K</div>
-                <div class="letter-box" onclick="rotate(this, 'I')">L</div>
-                <div class="letter-box" onclick="rotate(this, 'G')">M</div>
-                <div class="letter-box" onclick="rotate(this, 'N')">N</div>
-            </div>
-        </div>
-
-        <button id="unlock-btn" onclick="bookNow()">CALENDAR UNLOCKED - BOOK NOW</button>
+    <div class="grid">
+        <div class="row" id="row1"></div>
+        <div class="row" id="row2"></div>
     </div>
 
-    <script>
-        const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        let timeLeft = 3000; // 30 seconds
-        let timerActive = true;
+    <div id="unlock-zone">
+        <button class="btn-booking" id="bookBtn" onclick="window.location.href='https://calendly.com'">ACCESS GRANTED - BOOK NOW</button>
+    </div>
+</div>
 
-        // Initialize with random letters
-        document.querySelectorAll('.letter-box').forEach(box => {
-            box.innerText = alphabet[Math.floor(Math.random() * 26)];
+<script>
+    const words = ["TRUST", "ALIGN"];
+    const rows = [document.getElementById('row1'), document.getElementById('row2')];
+    let time = 3000;
+    let active = true;
+
+    // Build the interactive rows
+    words.forEach((word, rowIndex) => {
+        word.split('').forEach((char, charIndex) => {
+            const cell = document.createElement('div');
+            cell.className = 'cell';
+            // Start with a random letter that isn't the correct one
+            let randomChar;
+            do { randomChar = String.fromCharCode(65 + Math.floor(Math.random() * 26)); }
+            while (randomChar === char);
+            
+            cell.innerText = randomChar;
+            cell.dataset.target = char;
+            cell.onclick = () => rotate(cell);
+            rows[rowIndex].appendChild(cell);
         });
+    });
 
-        function rotate(element, target) {
-            if (element.classList.contains('locked')) return;
-            
-            // Move to next letter in alphabet
-            let current = alphabet.indexOf(element.innerText);
-            let next = (current + 1) % 26;
-            element.innerText = alphabet[next];
+    function rotate(el) {
+        if (el.classList.contains('solved')) return;
+        
+        let charCode = el.innerText.charCodeAt(0);
+        charCode = charCode === 90 ? 65 : charCode + 1; // Loop A-Z
+        el.innerText = String.fromCharCode(charCode);
 
-            // Check if it matches target
-            if (element.innerText === target) {
-                element.classList.add('locked');
-                checkWin();
-            }
+        if (el.innerText === el.dataset.target) {
+            el.classList.add('solved');
+            checkWin();
         }
+    }
 
-        function checkWin() {
-            const total = document.querySelectorAll('.letter-box').length;
-            const locked = document.querySelectorAll('.letter-box.locked').length;
-            
-            if (total === locked) {
-                timerActive = false;
-                document.getElementById('timer').innerText = "ACCESS GRANTED";
-                document.getElementById('timer').style.color = "#00ff00";
-                document.getElementById('unlock-btn').style.display = "block";
-            }
+    function checkWin() {
+        const solved = document.querySelectorAll('.solved').length;
+        if (solved === 10) {
+            active = false;
+            document.getElementById('timer').innerText = "UNLOCKED";
+            document.getElementById('timer').style.color = "#00ff00";
+            document.getElementById('bookBtn').style.display = "block";
         }
+    }
 
-        // Simple Countdown
-        const countdown = setInterval(() => {
-            if (!timerActive) return;
-            timeLeft--;
-            let display = (timeLeft / 100).toFixed(2);
-            document.getElementById('timer').innerText = display;
+    const clock = setInterval(() => {
+        if (!active) return;
+        time--;
+        document.getElementById('timer').innerText = (time/100).toFixed(2);
+        if (time <= 0) { clearInterval(clock); alert("CRITICAL FAILURE: ACCESS DENIED"); location.reload(); }
+    }, 10);
+</script>
 
-            if (timeLeft <= 0) {
-                clearInterval(countdown);
-                alert("TIME EXPIRED. System remains locked. Try again?");
-                location.reload();
-            }
-        }, 10);
-
-        function bookNow() {
-            // Replace this with your actual booking link (Calendly, etc.)
-            window.location.href = "https://redrockinternational.com/ma/contact-us/";
-        }
-    </script>
 </body>
 </html>
