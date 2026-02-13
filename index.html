@@ -3,42 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>RED ROCK | NEON OVERDRIVE</title>
+    <title>RED ROCK | HYPERLOOP</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #050505; font-family: 'Segoe UI', sans-serif; touch-action: none; }
-        canvas { display: block; }
+        /* BASE STYLES */
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; touch-action: none; }
+        canvas { display: block; position: absolute; top: 0; left: 0; z-index: 1; }
         
+        /* UI LAYER */
         #ui-layer {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none; display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 10; pointer-events: none;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
             text-align: center;
+            background: rgba(0,0,0,0.3); /* Slight dim for text pop */
         }
         
         h1 { 
             color: white; font-size: 3.5rem; margin: 0; 
-            text-shadow: 0 0 10px #ff0000, 0 0 20px #ff0000; 
-            letter-spacing: 5px; font-weight: 900;
-            font-style: italic;
+            text-shadow: 0 0 15px #ff0000; 
+            letter-spacing: 4px; font-weight: 900; font-style: italic;
+            animation: pulseText 2s infinite;
         }
         
-        p { color: #fff; font-size: 1.1rem; margin-top: 10px; text-shadow: 0 0 5px blue; }
+        p { color: #ddd; font-size: 1.1rem; margin-top: 10px; font-weight: bold; text-shadow: 0 0 5px black; }
 
+        /* BUTTONS - Visible by default now */
         .btn {
             pointer-events: auto;
-            background: linear-gradient(45deg, #ff0000, #cc0000);
-            border: none;
+            background: linear-gradient(90deg, #ff0000, #b30000);
+            border: 2px solid white;
             color: white;
-            padding: 15px 50px;
-            font-size: 1.2rem;
+            padding: 18px 50px;
+            font-size: 1.3rem;
             font-weight: bold;
             cursor: pointer;
-            margin-top: 25px;
+            margin-top: 30px;
             text-transform: uppercase;
             letter-spacing: 2px;
             transform: skew(-10deg);
-            box-shadow: 0 0 20px rgba(255, 0, 0, 0.6);
-            transition: all 0.2s;
-            display: none;
+            box-shadow: 0 0 25px rgba(255, 0, 0, 0.8);
+            display: inline-block; /* Ensure visibility */
+            transition: transform 0.1s;
         }
 
         .btn:active { transform: scale(0.95) skew(-10deg); }
@@ -46,54 +51,58 @@
         #score-board {
             position: absolute; top: 20px; left: 20px; color: white; 
             font-size: 1.5rem; font-weight: bold; font-family: monospace;
-            text-shadow: 0 0 10px white; pointer-events: none;
+            text-shadow: 0 0 10px #ff0000; z-index: 20; pointer-events: none;
         }
         
         #power-bar {
-            position: absolute; top: 0; left: 0; height: 10px; width: 0%; 
-            background: #00ffff; box-shadow: 0 0 20px #00ffff; transition: width 0.1s;
+            position: absolute; top: 0; left: 0; height: 8px; width: 0%; 
+            background: #00ffff; box-shadow: 0 0 15px #00ffff; z-index: 20;
         }
+
+        @keyframes pulseText { 0% { opacity: 0.8; } 50% { opacity: 1; } 100% { opacity: 0.8; } }
     </style>
 </head>
 <body>
 
     <div id="power-bar"></div>
     <div id="score-board">SCORE: 0</div>
-    <canvas id="gameCanvas"></canvas>
-
     <div id="ui-layer">
         <h1 id="title-text">RED ROCK</h1>
-        <p id="sub-text">COLLECT BLUE ORBS TO SMASH SILOS</p>
-        <button id="start-btn" class="btn">START ENGINE</button>
-        <button id="book-btn" class="btn">CLAIM VICTORY</button>
+        <p id="sub-text">DRAG TO FLY. SMASH THE SILOS.</p>
+        <button id="start-btn" class="btn" onclick="startGame()">START ENGINE</button>
+        <button id="book-btn" class="btn" onclick="openBooking()" style="display:none;">CLAIM VICTORY</button>
     </div>
 
+    <canvas id="gameCanvas"></canvas>
+
 <script>
+    // --- SETUP ---
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     
-    // Game Config
     let width, height;
-    let gameRunning = false;
+    let gameState = 'MENU'; // MENU, PLAYING, GAMEOVER, WIN
     let score = 0;
+    let frame = 0;
+    
+    // Entities
+    const player = { x: 0, y: 0, size: 12 };
+    const mouse = { x: 0, y: 0 };
     let particles = [];
     let enemies = [];
     let targets = [];
+    
+    // Powerup Logic
     let powerupActive = false;
     let powerupTimer = 0;
-    let frame = 0;
-    
-    // Screen Shake
     let shake = 0;
 
-    // Player
-    const player = { x: 0, y: 0, size: 12, angle: 0, speed: 0 };
-    const mouse = { x: 0, y: 0 };
-
+    // --- INITIALIZE ---
     function resize() {
         width = canvas.width = window.innerWidth;
         height = canvas.height = window.innerHeight;
-        if (!gameRunning) {
+        // Center player on resize if in menu
+        if (gameState === 'MENU') {
             player.x = width / 2;
             player.y = height / 2;
             mouse.x = width / 2;
@@ -101,57 +110,226 @@
         }
     }
     window.addEventListener('resize', resize);
-    resize();
+    resize(); // Call immediately
 
-    // Input
+    // Input Handling
     window.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
     window.addEventListener('touchmove', e => { 
-        e.preventDefault();
+        e.preventDefault(); 
         mouse.x = e.touches[0].clientX; 
         mouse.y = e.touches[0].clientY; 
     }, {passive: false});
+    window.addEventListener('touchstart', e => {
+        mouse.x = e.touches[0].clientX; 
+        mouse.y = e.touches[0].clientY;
+    }, {passive: false});
 
-    // UI
-    const startBtn = document.getElementById('start-btn');
-    const bookBtn = document.getElementById('book-btn');
-    const titleText = document.getElementById('title-text');
-    const subText = document.getElementById('sub-text');
-    const scoreText = document.getElementById('score-board');
-    const powerBar = document.getElementById('power-bar');
-
-    startBtn.style.display = 'block';
-
-    startBtn.onclick = startGame;
-    bookBtn.onclick = () => window.location.href = "https://calendly.com"; // YOUR LINK
-
+    // --- GAME CONTROL ---
     function startGame() {
-        gameRunning = true;
+        gameState = 'PLAYING';
         score = 0;
         enemies = [];
         targets = [];
         particles = [];
-        shake = 0;
         powerupActive = false;
-        
-        startBtn.style.display = 'none';
-        bookBtn.style.display = 'none';
-        titleText.style.display = 'none';
-        subText.style.display = 'none';
-        
+        document.getElementById('start-btn').style.display = 'none';
+        document.getElementById('title-text').style.display = 'none';
+        document.getElementById('sub-text').style.display = 'none';
+        document.getElementById('book-btn').style.display = 'none';
+        document.getElementById('score-board').innerText = "SCORE: 0";
         spawnTarget();
-        loop();
     }
 
-    // --- GAME LOOP ---
+    function openBooking() {
+        window.location.href = "https://calendly.com"; // YOUR CALENDAR LINK
+    }
+
+    function gameOver(win) {
+        gameState = win ? 'WIN' : 'GAMEOVER';
+        const title = document.getElementById('title-text');
+        const sub = document.getElementById('sub-text');
+        const start = document.getElementById('start-btn');
+        const book = document.getElementById('book-btn');
+
+        title.style.display = 'block';
+        sub.style.display = 'block';
+        
+        if (win) {
+            title.innerText = "MISSION ACCOMPLISHED";
+            title.style.color = "#00ff00";
+            sub.innerText = "Team alignment achieved.";
+            book.style.display = 'inline-block';
+        } else {
+            title.innerText = "SILO DETECTED";
+            title.style.color = "red";
+            sub.innerText = "Don't let friction stop you.";
+            start.innerText = "RETRY";
+            start.style.display = 'inline-block';
+        }
+    }
+
+    // --- MAIN LOOP ---
     function loop() {
-        if (!gameRunning) return;
         requestAnimationFrame(loop);
         frame++;
 
-        // 1. Logic
-        updatePlayer();
-        updateEntities();
-        
-        // 2. Draw Background (Grid Effect)
+        // 1. CLEAR & SHAKE
         ctx.fillStyle = '#050505';
-        ctx.fillRect
+        ctx.fillRect(0, 0, width, height);
+        
+        ctx.save();
+        if (shake > 0) {
+            ctx.translate((Math.random()-0.5)*shake, (Math.random()-0.5)*shake);
+            shake *= 0.9;
+            if (shake < 0.5) shake = 0;
+        }
+
+        // 2. BACKGROUND GRID (Always moves)
+        drawGrid();
+
+        // 3. PLAYER MOVEMENT (Always active)
+        const dx = mouse.x - player.x;
+        const dy = mouse.y - player.y;
+        player.x += dx * 0.12; // Snappier response
+        player.y += dy * 0.12;
+        
+        drawPlayer();
+
+        // 4. GAME LOGIC (Only when playing)
+        if (gameState === 'PLAYING') {
+            updateGameLogic();
+        }
+
+        // 5. PARTICLES (Always draw)
+        updateParticles();
+
+        ctx.restore();
+        
+        // Powerup UI
+        if (powerupActive) {
+            powerupTimer--;
+            document.getElementById('power-bar').style.width = (powerupTimer/300*100) + "%";
+            if (powerupTimer <= 0) powerupActive = false;
+        }
+    }
+
+    function updateGameLogic() {
+        // Targets
+        targets.forEach((t, i) => {
+            const dist = Math.hypot(player.x - t.x, player.y - t.y);
+            if (dist < player.size + t.size + 15) {
+                targets.splice(i, 1);
+                score += 10;
+                document.getElementById('score-board').innerText = "SCORE: " + score;
+                createExplosion(t.x, t.y, t.isPower ? '#00ffff' : '#00ff00', 15);
+                shake = 5;
+                if (t.isPower) { powerupActive = true; powerupTimer = 300; shake = 20; }
+                
+                if (score >= 150) gameOver(true);
+                else {
+                    spawnTarget();
+                    if (score % 20 === 0) spawnEnemy();
+                }
+            }
+        });
+
+        // Enemies
+        enemies.forEach((e, i) => {
+            const angle = Math.atan2(player.y - e.y, player.x - e.x);
+            const speed = powerupActive ? 1 : (2.5 + score * 0.01);
+            e.x += Math.cos(angle) * speed;
+            e.y += Math.sin(angle) * speed;
+
+            // Draw Enemy
+            ctx.fillStyle = powerupActive ? '#00ffff' : '#ff0000';
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = ctx.fillStyle;
+            ctx.beginPath();
+            ctx.arc(e.x, e.y, e.size, 0, Math.PI*2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // Collision
+            if (Math.hypot(player.x - e.x, player.y - e.y) < player.size + e.size) {
+                if (powerupActive) {
+                    enemies.splice(i, 1);
+                    createExplosion(e.x, e.y, '#ffffff', 30);
+                    score += 50; shake = 15;
+                    document.getElementById('score-board').innerText = "SCORE: " + score;
+                } else {
+                    gameOver(false);
+                }
+            }
+        });
+
+        // Draw Targets
+        targets.forEach(t => {
+            ctx.fillStyle = t.isPower ? '#00ffff' : '#00ff00';
+            ctx.shadowBlur = 15; ctx.shadowColor = ctx.fillStyle;
+            ctx.beginPath(); ctx.arc(t.x, t.y, t.size + Math.sin(frame*0.1)*2, 0, Math.PI*2); ctx.fill();
+            ctx.shadowBlur = 0;
+        });
+    }
+
+    function drawPlayer() {
+        ctx.fillStyle = '#fff';
+        ctx.shadowBlur = 20; ctx.shadowColor = powerupActive ? '#00ffff' : '#ff0000';
+        ctx.beginPath(); ctx.arc(player.x, player.y, player.size, 0, Math.PI*2); ctx.fill();
+        ctx.shadowBlur = 0;
+        
+        // Thruster
+        if (frame % 3 === 0) {
+            particles.push({x: player.x, y: player.y, vx: (Math.random()-0.5)*2, vy: (Math.random()-0.5)*2, life: 1, color: ctx.shadowColor});
+        }
+    }
+
+    function drawGrid() {
+        ctx.strokeStyle = '#220000'; ctx.lineWidth = 2;
+        const offset = frame * 2 % 50;
+        ctx.beginPath();
+        for(let i=offset; i<width; i+=50) { ctx.moveTo(i,0); ctx.lineTo(i,height); }
+        for(let i=0; i<height; i+=50) { ctx.moveTo(0,i); ctx.lineTo(width,i); }
+        ctx.stroke();
+    }
+
+    function updateParticles() {
+        for(let i=particles.length-1; i>=0; i--) {
+            let p = particles[i];
+            p.x += p.vx; p.y += p.vy; p.life -= 0.05;
+            ctx.fillStyle = p.color; ctx.globalAlpha = Math.max(0, p.life);
+            ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI*2); ctx.fill();
+            ctx.globalAlpha = 1;
+            if(p.life <= 0) particles.splice(i, 1);
+        }
+    }
+
+    function createExplosion(x, y, color, count) {
+        for(let i=0; i<count; i++) {
+            particles.push({
+                x: x, y: y,
+                vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10,
+                life: 1, color: color
+            });
+        }
+    }
+
+    function spawnTarget() {
+        targets.push({
+            x: Math.random()*(width-50)+25, y: Math.random()*(height-50)+25,
+            size: 10, isPower: Math.random()>0.8
+        });
+    }
+
+    function spawnEnemy() {
+        let ex, ey;
+        do { ex=Math.random()*width; ey=Math.random()*height; } 
+        while(Math.hypot(ex-player.x, ey-player.y) < 400);
+        enemies.push({x: ex, y: ey, size: 15});
+    }
+
+    // START THE LOOP IMMEDIATELY
+    loop();
+
+</script>
+</body>
+</html>
